@@ -1,4 +1,7 @@
 {
   "name": "chastity",
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "volta": {
+    "node": "18.16.1"
+  }
 }
