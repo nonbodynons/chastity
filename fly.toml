@@ -12,3 +12,10 @@ primary_region = "nrt"
   auto_stop_machines = true
   auto_start_machines = true
   min_machines_running = 0
+
+[env]
+  CHASTER_CLIENT_ID = "test-808352"
+  # CHASTER_CLIENT_SECRET = ""
+  CHASTER_REDIRECT_URI = "https://chastity.fly.dev/oidc"
+  SESSION_COOKIE_SECURE_OPTION = "true"
+  # SESSION_SECRET = ""
