@@ -2,6 +2,7 @@ import axios from "axios";
 import express from "express";
 import { engine } from "express-handlebars";
 import session from "express-session";
+import { decodeJwt } from "jose";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
@@ -14,6 +15,7 @@ app.set("views", "./views");
 declare module "express-session" {
   interface SessionData {
     oauth2state?: string;
+    userName?: string;
   }
 }
 
@@ -55,7 +57,10 @@ app.get(
     url.searchParams.set("scope", "locks");
     url.searchParams.set("state", req.session.oauth2state);
 
-    res.render("index", { url: url.toString() });
+    res.render("index", {
+      url: url.toString(),
+      userName: req.session.userName,
+    });
   })
 );
 
@@ -79,7 +84,9 @@ app.get(
       return next(new Error("invalid state"));
     }
 
-    const { data } = await axios.post(
+    const {
+      data: { access_token },
+    } = await axios.post(
       "https://sso.chaster.app/auth/realms/app/protocol/openid-connect/token",
       new URLSearchParams({
         client_id: process.env["CHASTER_CLIENT_ID"]!,
@@ -89,7 +96,9 @@ app.get(
         redirect_uri: process.env["CHASTER_REDIRECT_URI"]!,
       })
     );
-    console.info(data);
+
+    const { preferred_username } = decodeJwt(access_token);
+    req.session.userName = preferred_username as string;
 
     res.redirect("/");
   })
