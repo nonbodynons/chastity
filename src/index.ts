@@ -4,6 +4,7 @@ import { engine } from "express-handlebars";
 import session from "express-session";
 import { decodeJwt } from "jose";
 import { randomUUID } from "node:crypto";
+import { Pool } from "pg";
 import { z } from "zod";
 
 const app = express();
@@ -11,6 +12,10 @@ app.engine("handlebars", engine());
 app.set("trust proxy", 1);
 app.set("view engine", "handlebars");
 app.set("views", "./views");
+
+const pool = new Pool({
+  connectionString: process.env["DATABASE_URL"],
+});
 
 declare module "express-session" {
   interface SessionData {
@@ -85,7 +90,7 @@ app.get(
     }
 
     const {
-      data: { access_token },
+      data: { access_token, refresh_token },
     } = await axios.post(
       "https://sso.chaster.app/auth/realms/app/protocol/openid-connect/token",
       new URLSearchParams({
@@ -97,8 +102,15 @@ app.get(
       })
     );
 
-    const { preferred_username } = decodeJwt(access_token);
-    req.session.userName = preferred_username as string;
+    const { sub } = decodeJwt(access_token);
+    console.info(sub);
+
+    const client = await pool.connect();
+    await client.query(
+      "INSERT INTO users (userId, accessToken, refreshToken) VALUES ($1, $2, $3) ON CONFLICT (userId) DO UPDATE SET userId = $1, accessToken = $2, refreshToken = $3",
+      [sub, access_token, refresh_token]
+    );
+    client.release();
 
     res.redirect("/");
   })

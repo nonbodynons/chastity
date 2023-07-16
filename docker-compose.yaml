@@ -1,0 +1,10 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:15.3-alpine
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: Q3eEMRNp
+    volumes:
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
