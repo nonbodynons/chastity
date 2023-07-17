@@ -6,6 +6,7 @@ import { decodeJwt } from "jose";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { z } from "zod";
+import { SessionStore } from "./session-store";
 
 const app = express();
 app.engine("handlebars", engine());
@@ -20,20 +21,25 @@ const pool = new Pool({
 declare module "express-session" {
   interface SessionData {
     oauth2state?: string;
+    userId?: string;
     userName?: string;
   }
 }
 
 app.use(
   session({
+    store: new SessionStore(pool),
     secret: process.env["SESSION_SECRET"]!,
     cookie: {
+      httpOnly: true,
+      maxAge: 24 * 3600 * 1000,
       sameSite: "strict",
       secure: process.env["SESSION_COOKIE_SECURE_OPTION"] === "true",
     },
-    resave: true,
+    genid: () => randomUUID(),
+    resave: false,
     rolling: true,
-    saveUninitialized: true,
+    saveUninitialized: false,
   })
 );
 
@@ -102,15 +108,26 @@ app.get(
       })
     );
 
-    const { sub } = decodeJwt(access_token);
-    console.info(sub);
+    const { sub, preferred_username } = decodeJwt(access_token);
 
     const client = await pool.connect();
     await client.query(
-      "INSERT INTO users (userId, accessToken, refreshToken) VALUES ($1, $2, $3) ON CONFLICT (userId) DO UPDATE SET userId = $1, accessToken = $2, refreshToken = $3",
+      "INSERT INTO users (user_id, access_token, refresh_token) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO UPDATE SET user_id = $1, access_token = $2, refresh_token = $3",
       [sub, access_token, refresh_token]
     );
     client.release();
+
+    await new Promise<void>((resolve, reject) => {
+      req.session.regenerate((err) => {
+        if (err) {
+          return reject(err);
+        }
+        return resolve();
+      });
+    });
+
+    req.session.userId = sub;
+    req.session.userName = preferred_username as string;
 
     res.redirect("/");
   })
