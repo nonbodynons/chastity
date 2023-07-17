@@ -26,6 +26,8 @@ declare module "express-session" {
   }
 }
 
+app.use("/static", express.static("static"));
+
 app.use(
   session({
     store: new SessionStore(pool),
